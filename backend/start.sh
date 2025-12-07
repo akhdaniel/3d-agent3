@@ -1,0 +1,1 @@
+nohup yarn dev > /tmp/backend.log 2>&1 &
