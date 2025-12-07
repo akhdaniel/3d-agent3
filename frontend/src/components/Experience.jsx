@@ -3,6 +3,7 @@ import {
   ContactShadows,
   Environment,
   Text,
+  useProgress,
 } from "@react-three/drei";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useChat } from "../hooks/useChat";
@@ -10,6 +11,7 @@ import { Avatar } from "./Avatar";
 
 const Dots = (props) => {
   const { loading } = useChat();
+  const { active, progress } = useProgress();
   const [loadingText, setLoadingText] = useState("");
   useEffect(() => {
     if (loading) {
@@ -26,6 +28,16 @@ const Dots = (props) => {
       setLoadingText("");
     }
   }, [loading]);
+  if (active) {
+    return (
+      <group {...props}>
+        <Text fontSize={0.14} anchorX={"left"} anchorY={"bottom"}>
+          {`Loading ${Math.round(progress)}%`}
+          <meshBasicMaterial attach="material" color="black" />
+        </Text>
+      </group>
+    );
+  }
   if (!loading) return null;
   return (
     <group {...props}>
