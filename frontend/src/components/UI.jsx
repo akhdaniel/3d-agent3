@@ -17,6 +17,7 @@ export const UI = ({ hidden, ...props }) => {
     setCameraZoomed,
     message,
     currentUser,
+    pendingTranscript,
   } = useChat();
   const [isListening, setIsListening] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -366,6 +367,14 @@ export const UI = ({ hidden, ...props }) => {
             </svg>
           </button>
         </div>
+        {pendingTranscript && (
+          <div className="pointer-events-auto w-full max-w-screen-sm mx-auto mb-2">
+            <div className="bg-white/80 backdrop-blur rounded-md px-4 py-2 text-sm text-gray-900 border border-white/70 shadow">
+              <span className="font-semibold text-gray-700">You said:</span>{" "}
+              <span className="italic">“{pendingTranscript}”</span>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
           <input
             className="w-full placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 bg-white backdrop-blur-md"

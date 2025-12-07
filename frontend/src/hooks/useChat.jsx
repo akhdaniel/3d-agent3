@@ -21,11 +21,18 @@ export const ChatProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [cameraZoomed, setCameraZoomed] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [pendingTranscript, setPendingTranscript] = useState("");
 
   const isAuthenticated = Boolean(authToken);
 
   const onMessagePlayed = () => {
-    setMessages((messages) => messages.slice(1));
+    setMessages((messages) => {
+      const next = messages.slice(1);
+      if (next.length === 0) {
+        setPendingTranscript("");
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -56,6 +63,7 @@ export const ChatProvider = ({ children }) => {
       }
       const resp = json.messages || [];
       setMessages((messages) => [...messages, ...resp]);
+      setPendingTranscript("");
       return json;
     } finally {
       setLoading(false);
@@ -69,6 +77,7 @@ export const ChatProvider = ({ children }) => {
     if (!audioBlob) {
       return null;
     }
+    setPendingTranscript("");
     setLoading(true);
     try {
       const formData = new FormData();
@@ -84,6 +93,7 @@ export const ChatProvider = ({ children }) => {
       if (!response.ok) {
         throw new Error(json?.error || "Failed to process voice chat.");
       }
+      setPendingTranscript(json?.transcript || "");
       const resp = json.messages || [];
       setMessages((messages) => [...messages, ...resp]);
       return json;
@@ -150,6 +160,7 @@ export const ChatProvider = ({ children }) => {
     setMessages([]);
     setMessage(null);
     setCurrentUser(null);
+    setPendingTranscript("");
     if (!token) {
       return;
     }
@@ -177,6 +188,7 @@ export const ChatProvider = ({ children }) => {
         authLoading,
         authError,
         currentUser,
+        pendingTranscript,
         message,
         onMessagePlayed,
         loading,
