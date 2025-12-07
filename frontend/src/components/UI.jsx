@@ -132,7 +132,7 @@ export const UI = ({ hidden, ...props }) => {
             </svg>
           </button>
         </div>
-        <div className="flex items-center gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pointer-events-auto max-w-screen-sm w-full mx-auto">
           <input
             className="w-full placeholder:text-gray-800 placeholder:italic p-4 rounded-md bg-opacity-50 bg-white backdrop-blur-md"
             placeholder="Type a message..."
@@ -146,11 +146,11 @@ export const UI = ({ hidden, ...props }) => {
           <button
             disabled={loading || message}
             onClick={sendMessage}
-            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md ${
+            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md w-full sm:w-auto ${
               loading || message ? "cursor-not-allowed opacity-30" : ""
             }`}
           >
-            Send
+            <span className="mr-2">►</span>Send
           </button>
           <button
             disabled={loading || message}
@@ -159,11 +159,19 @@ export const UI = ({ hidden, ...props }) => {
               isRecording
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-violet-500 hover:bg-violet-600"
-            } text-white p-4 px-6 font-semibold uppercase rounded-md flex-none whitespace-nowrap ${
+            } text-white p-4 px-6 font-semibold uppercase rounded-md w-full sm:w-auto flex-none whitespace-nowrap ${
               loading || message ? "cursor-not-allowed opacity-30" : ""
             }`}
           >
-            {isRecording ? "Stop Recording" : "Start Talking"}
+            {isRecording ? (
+              <>
+                <span className="mr-2">⏹</span>Stop Recording
+              </>
+            ) : (
+              <>
+                <span className="mr-2">⏺</span>Start Talking
+              </>
+            )}
           </button>
         </div>
       </div>
