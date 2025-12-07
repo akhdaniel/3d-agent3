@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChat } from "../hooks/useChat";
 
 export const UI = ({ hidden, ...props }) => {
@@ -18,19 +18,38 @@ export const UI = ({ hidden, ...props }) => {
     message,
     currentUser,
   } = useChat();
+  const [isListening, setIsListening] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const listeningStreamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const monitorIdRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const isListeningRef = useRef(false);
+  const isRecordingRef = useRef(false);
+  const latestLoadingRef = useRef(loading);
+  const latestMessageRef = useRef(message);
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authMessage, setAuthMessage] = useState("");
 
+  useEffect(() => {
+    latestLoadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    latestMessageRef.current = message;
+  }, [message]);
+
   const sendMessage = () => {
     const text = input.current.value;
-    if (!loading && !message) {
-      chat(text);
-      input.current.value = "";
+    if (!text.trim() || loading || message) {
+      return;
     }
+    chat(text.trim());
+    input.current.value = "";
   };
 
   const requireAuthFields = () => {
@@ -68,46 +87,147 @@ export const UI = ({ hidden, ...props }) => {
     }
   };
 
-  const startTalking = async () => {
-    if (loading || message || isRecording) {
+  const cleanupSilenceTimer = () => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+  };
+
+  const stopRecordingInternal = () => {
+    cleanupSilenceTimer();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+  };
+
+  const handleRecorderStop = async () => {
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    if (!blob.size) {
+      return;
+    }
+    try {
+      await chatFromVoice(blob);
+    } catch (err) {
+      console.error("Failed to send voice chat", err);
+    }
+  };
+
+  const startRecording = () => {
+    if (
+      !listeningStreamRef.current ||
+      mediaRecorderRef.current ||
+      latestLoadingRef.current ||
+      latestMessageRef.current
+    ) {
+      return;
+    }
+    audioChunksRef.current = [];
+    const recorder = new MediaRecorder(listeningStreamRef.current, {
+      mimeType: "audio/webm",
+    });
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+    recorder.onstop = handleRecorderStop;
+    mediaRecorderRef.current = recorder;
+    cleanupSilenceTimer();
+    recorder.start();
+    setIsRecording(true);
+    isRecordingRef.current = true;
+  };
+
+  const monitorAudio = () => {
+    if (!isListeningRef.current || !analyserRef.current) {
+      return;
+    }
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      sum += Math.abs(dataArray[i] - 128);
+    }
+    const normalizedVolume = sum / bufferLength / 128;
+    const speechThreshold = 0.06;
+    const silenceThreshold = 0.02;
+
+    if (!isRecordingRef.current && normalizedVolume > speechThreshold) {
+      startRecording();
+    } else if (isRecordingRef.current) {
+      if (normalizedVolume < silenceThreshold) {
+        if (!silenceTimeoutRef.current) {
+          silenceTimeoutRef.current = setTimeout(() => {
+            stopRecordingInternal();
+          }, 1500);
+        }
+      } else {
+        cleanupSilenceTimer();
+      }
+    }
+    monitorIdRef.current = requestAnimationFrame(monitorAudio);
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+    isListeningRef.current = false;
+    cleanupSilenceTimer();
+    if (monitorIdRef.current) {
+      cancelAnimationFrame(monitorIdRef.current);
+      monitorIdRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    const stream = listeningStreamRef.current;
+    listeningStreamRef.current = null;
+    if (isRecordingRef.current) {
+      stopRecordingInternal();
+    }
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    analyserRef.current = null;
+  };
+
+  const startListening = async () => {
+    if (isListeningRef.current) {
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-      recorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        recorder.stream.getTracks().forEach((track) => track.stop());
-        setIsRecording(false);
-        if (!blob.size) {
-          console.warn("Recorded audio is empty.");
-          return;
-        }
-        try {
-          await chatFromVoice(blob);
-        } catch (err) {
-          console.error("Failed to send voice chat", err);
-        }
-      };
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setIsRecording(true);
+      listeningStreamRef.current = stream;
+      const AudioContextImpl = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextImpl();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      setIsListening(true);
+      isListeningRef.current = true;
+      monitorAudio();
     } catch (err) {
-      console.error("Unable to access microphone", err);
+      console.error("Unable to start microphone monitoring", err);
+      stopListening();
     }
   };
 
-  const stopTalking = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-    }
-  };
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, []);
   if (hidden) {
     return null;
   }
@@ -162,6 +282,8 @@ export const UI = ({ hidden, ...props }) => {
       </div>
     );
   }
+
+  const listenButtonDisabled = authLoading && !isListening;
 
   return (
     <>
@@ -258,30 +380,30 @@ export const UI = ({ hidden, ...props }) => {
           <button
             disabled={loading || message}
             onClick={sendMessage}
-            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md w-full sm:w-auto ${
+            className={`bg-pink-500 hover:bg-pink-600 text-white p-4 px-10 font-semibold uppercase rounded-md w-full sm:w-auto  whitespace-nowrap ${
               loading || message ? "cursor-not-allowed opacity-30" : ""
             }`}
           >
             <span className="mr-2">►</span>Send
           </button>
           <button
-            disabled={loading || message}
-            onClick={isRecording ? stopTalking : startTalking}
+            disabled={listenButtonDisabled}
+            onClick={isListening ? stopListening : startListening}
             className={`${
-              isRecording
+              isListening
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-violet-500 hover:bg-violet-600"
             } text-white p-4 px-6 font-semibold uppercase rounded-md w-full sm:w-auto flex-none whitespace-nowrap ${
-              loading || message ? "cursor-not-allowed opacity-30" : ""
+              listenButtonDisabled ? "cursor-not-allowed opacity-30" : ""
             }`}
           >
-            {isRecording ? (
+            {isListening ? (
               <>
-                <span className="mr-2">⏹</span>Stop Recording
+                <span className="mr-2">⏹</span>Stop Listening
               </>
             ) : (
               <>
-                <span className="mr-2">⏺</span>Start Talking
+                <span className="mr-2">⏺</span>Start Listening
               </>
             )}
           </button>
