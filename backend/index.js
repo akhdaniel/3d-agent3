@@ -1,4 +1,5 @@
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
+import crypto from "crypto";
 import cors from "cors";
 import dotenv from "dotenv";
 import voice from "elevenlabs-node";
@@ -26,6 +27,102 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 const tempUploadDir = path.join(process.cwd(), ".tmp-voice");
+const authDbPath = path.join(process.cwd(), "auth.db");
+const activeTokens = new Map();
+
+const runSqlite = (sql, { json = false } = {}) => {
+  return new Promise((resolve, reject) => {
+    const args = [];
+    if (json) {
+      args.push("-json");
+    }
+    args.push(authDbPath, sql);
+    execFile("sqlite3", args, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr?.trim() || error.message));
+        return;
+      }
+      if (json) {
+        const trimmed = stdout.trim();
+        if (!trimmed) {
+          resolve([]);
+          return;
+        }
+        try {
+          resolve(JSON.parse(trimmed));
+        } catch (parseError) {
+          reject(parseError);
+        }
+        return;
+      }
+      resolve(stdout.trim());
+    });
+  });
+};
+
+const sqliteValue = (value = "") => `'${value.replace(/'/g, "''")}'`;
+
+let authInitialized = false;
+const initializeAuthStore = async () => {
+  if (authInitialized) {
+    return;
+  }
+  await runSqlite(
+    "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL)"
+  );
+  authInitialized = true;
+};
+
+const hashPassword = (password, salt) =>
+  crypto.scryptSync(password, salt, 64).toString("hex");
+
+const createUserRecord = async (username, password) => {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(password, salt);
+  const sql = `INSERT INTO users (username, password_hash, salt) VALUES (${sqliteValue(
+    username
+  )}, ${sqliteValue(passwordHash)}, ${sqliteValue(salt)})`;
+  await runSqlite(sql);
+};
+
+const getUserByUsername = async (username) => {
+  const sql = `SELECT id, username, password_hash, salt FROM users WHERE username = ${sqliteValue(
+    username
+  )} LIMIT 1`;
+  const rows = await runSqlite(sql, { json: true });
+  return rows[0];
+};
+
+const verifyPassword = (password, user) => {
+  if (!user) {
+    return false;
+  }
+  const computed = hashPassword(password, user.salt);
+  const storedBuffer = Buffer.from(user.password_hash, "hex");
+  const computedBuffer = Buffer.from(computed, "hex");
+  if (storedBuffer.length !== computedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(storedBuffer, computedBuffer);
+};
+
+const normalizeCredential = (value) => (value || "").trim();
+
+const authenticateRequest = (req, res, next) => {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    res.status(401).send({ error: "Missing authentication token." });
+    return;
+  }
+  const token = authHeader.slice(7);
+  const username = activeTokens.get(token);
+  if (!username) {
+    res.status(401).send({ error: "Invalid or expired token." });
+    return;
+  }
+  req.user = { username, token };
+  next();
+};
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -33,6 +130,60 @@ app.get("/", (req, res) => {
 
 app.get("/voices", async (req, res) => {
   res.send(await voice.getVoices(elevenLabsApiKey));
+});
+
+app.post("/auth/register", async (req, res) => {
+  const username = normalizeCredential(req.body?.username);
+  const password = req.body?.password || "";
+  if (!username || !password) {
+    res.status(400).send({ error: "Username and password are required." });
+    return;
+  }
+  if (password.length < 4) {
+    res
+      .status(400)
+      .send({ error: "Password should be at least 4 characters long." });
+    return;
+  }
+  try {
+    const existing = await getUserByUsername(username);
+    if (existing) {
+      res.status(409).send({ error: "Username is already taken." });
+      return;
+    }
+    await createUserRecord(username, password);
+    res.send({ status: "registered" });
+  } catch (error) {
+    console.error("[auth/register] Failed to register user", error);
+    res.status(500).send({ error: "Failed to register user." });
+  }
+});
+
+app.post("/auth/login", async (req, res) => {
+  const username = normalizeCredential(req.body?.username);
+  const password = req.body?.password || "";
+  if (!username || !password) {
+    res.status(400).send({ error: "Username and password are required." });
+    return;
+  }
+  try {
+    const user = await getUserByUsername(username);
+    if (!verifyPassword(password, user)) {
+      res.status(401).send({ error: "Invalid username or password." });
+      return;
+    }
+    const token = crypto.randomBytes(24).toString("hex");
+    activeTokens.set(token, username);
+    res.send({ token, username });
+  } catch (error) {
+    console.error("[auth/login] Failed to login user", error);
+    res.status(500).send({ error: "Failed to login." });
+  }
+});
+
+app.post("/auth/logout", authenticateRequest, (req, res) => {
+  activeTokens.delete(req.user.token);
+  res.send({ status: "logged_out" });
 });
 
 const execCommand = (command) => {
@@ -181,7 +332,7 @@ const processChatFlow = async (userMessage) => {
   return { messages };
 };
 
-app.post("/chat", async (req, res) => {
+app.post("/chat", authenticateRequest, async (req, res) => {
   try {
     const payload = await processChatFlow(req.body?.message);
     res.send(payload);
@@ -219,26 +370,33 @@ const transcribeAudioToText = async (file) => {
   }
 };
 
-app.post("/chat/voice", upload.single("audio"), async (req, res) => {
-  if (!req.file) {
-    res.status(400).send({ error: "Audio file is required." });
-    return;
-  }
-
-  try {
-    const transcript = await transcribeAudioToText(req.file);
-    if (!transcript) {
-      res.status(400).send({ error: "Unable to transcribe the provided audio." });
+app.post(
+  "/chat/voice",
+  authenticateRequest,
+  upload.single("audio"),
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).send({ error: "Audio file is required." });
       return;
     }
 
-    const payload = await processChatFlow(transcript);
-    res.send({ transcript, ...payload });
-  } catch (error) {
-    console.error("[chat/voice] Failed to handle voice request", error);
-    res.status(500).send({ error: "Failed to process voice chat request." });
+    try {
+      const transcript = await transcribeAudioToText(req.file);
+      if (!transcript) {
+        res
+          .status(400)
+          .send({ error: "Unable to transcribe the provided audio." });
+        return;
+      }
+
+      const payload = await processChatFlow(transcript);
+      res.send({ transcript, ...payload });
+    } catch (error) {
+      console.error("[chat/voice] Failed to handle voice request", error);
+      res.status(500).send({ error: "Failed to process voice chat request." });
+    }
   }
-});
+);
 
 const readJsonTranscript = async (file) => {
   const data = await fs.readFile(file, "utf8");
@@ -250,6 +408,16 @@ const audioFileToBase64 = async (file) => {
   return data.toString("base64");
 };
 
-app.listen(port, () => {
-  console.log(`Virtual CS listening on port ${port}`);
-});
+const startServer = async () => {
+  try {
+    await initializeAuthStore();
+    app.listen(port, () => {
+      console.log(`Virtual CS listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to initialize authentication store", error);
+    process.exit(1);
+  }
+};
+
+startServer();

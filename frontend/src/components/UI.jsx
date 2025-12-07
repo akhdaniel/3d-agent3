@@ -3,11 +3,27 @@ import { useChat } from "../hooks/useChat";
 
 export const UI = ({ hidden, ...props }) => {
   const input = useRef();
-  const { chat, chatFromVoice, loading, cameraZoomed, setCameraZoomed, message } =
-    useChat();
+  const {
+    chat,
+    chatFromVoice,
+    login,
+    register,
+    logout,
+    isAuthenticated,
+    authLoading,
+    authError,
+    loading,
+    cameraZoomed,
+    setCameraZoomed,
+    message,
+    currentUser,
+  } = useChat();
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
 
   const sendMessage = () => {
     const text = input.current.value;
@@ -16,7 +32,41 @@ export const UI = ({ hidden, ...props }) => {
       input.current.value = "";
     }
   };
-  
+
+  const requireAuthFields = () => {
+    if (!authUsername.trim() || !authPassword.trim()) {
+      setAuthMessage("Please enter both username and password.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleLogin = async () => {
+    if (!requireAuthFields()) {
+      return;
+    }
+    setAuthMessage("");
+    try {
+      await login(authUsername.trim(), authPassword);
+      setAuthPassword("");
+    } catch (error) {
+      setAuthMessage(error.message);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!requireAuthFields()) {
+      return;
+    }
+    setAuthMessage("");
+    try {
+      await register(authUsername.trim(), authPassword);
+      setAuthMessage("Account created! Please log in.");
+      setAuthPassword("");
+    } catch (error) {
+      setAuthMessage(error.message);
+    }
+  };
 
   const startTalking = async () => {
     if (loading || message || isRecording) {
@@ -62,12 +112,74 @@ export const UI = ({ hidden, ...props }) => {
     return null;
   }
 
+  if (!isAuthenticated) {
+    const statusMessage = authMessage || authError;
+    return (
+      <div className="fixed inset-0 z-20 flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl w-full max-w-md p-6 pointer-events-auto">
+          <h2 className="text-2xl font-bold mb-4 text-center">Welcome Back</h2>
+          <div className="flex flex-col gap-3">
+            <input
+              className="p-3 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+              placeholder="Username"
+              value={authUsername}
+              onChange={(e) => setAuthUsername(e.target.value)}
+              autoComplete="username"
+            />
+            <input
+              type="password"
+              className="p-3 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+              placeholder="Password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+            {statusMessage && (
+              <p className="text-sm text-red-600">{statusMessage}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleLogin}
+                disabled={authLoading}
+                className={`flex-1 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-md p-3 ${
+                  authLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                Log In
+              </button>
+              <button
+                onClick={handleRegister}
+                disabled={authLoading}
+                className={`flex-1 bg-violet-500 hover:bg-violet-600 text-white font-semibold rounded-md p-3 ${
+                  authLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                Register
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="fixed top-0 left-0 right-0 bottom-0 z-10 flex justify-between p-4 flex-col pointer-events-none">
-        <div className="self-start backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
+        <div className="self-start pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
           <h1 className="font-black text-xl">Virtual CS</h1>
           <p>Ask me anything...in any language 😅</p>
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            {currentUser && (
+              <span className="text-gray-700">Logged in as {currentUser}</span>
+            )}
+            <button
+              onClick={logout}
+              className="pointer-events-auto bg-gray-900 text-white px-3 py-1 rounded-md text-xs uppercase tracking-wider"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         <div className="w-full flex flex-col items-end justify-center gap-4">
           <button
