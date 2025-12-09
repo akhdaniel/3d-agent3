@@ -8,7 +8,7 @@ const ChatContext = createContext();
 const defaultVoiceId = "EXAVITQu4vr4xnSDxMaL";
 const avatarOptions = [
   { id: "avatar1", label: "Sarah", voice_id: defaultVoiceId, gender: "female" },
-  { id: "avatar2", label: "Christina", voice_id: "2qfp6zPuviqeCOZIE9RZ", gender: "female" },
+  { id: "avatar2", label: "Christina", voice_id: "RbNgJzKAV7jpYJNtCBpj", gender: "female" },
   { id: "avatar3", label: "Nathaniel", voice_id: "AeRdCCKzvd23BpJoofzx", gender: "male" },
   { id: "avatar4", label: "Roger", voice_id: "CwhRBWXzGAHq8TQ4Fs17", gender: "male" },
   { id: "avatar5", label: "Laura", voice_id: "FGY2WhTYpPnrIDTdsKH5", gender: "female" },
@@ -17,7 +17,7 @@ const avatarOptions = [
   { id: "avatar8", label: "Alice", voice_id: "Xb7hH8MSUJpSbSDYk0k2", gender: "female" },
   { id: "avatar9", label: "Matilda", voice_id: "XrExE9yKIg1WjnnlVkGX", gender: "female" },
   { id: "avatar10", label: "Jessica", voice_id: "cgSgspJ2msm6clMCkdW9", gender: "female" },
-  { id: "avatar11", label: "Eric", voice_id: "cjVigY5qzO86Huf0OWal", gender: "male" },
+  { id: "avatar11", label: "Eric", voice_id: "GxqThEDZF0RjxmGomt0o", gender: "male" },
   { id: "avatar12", label: "Chris", voice_id: "iP95p4xoKVk53GoZ742B", gender: "male" },
   { id: "avatar13", label: "Lily", voice_id: "pFZP5JQG7iQjIQuC4Bku", gender: "female" },
   { id: "avatar14", label: "Hamza", voice_id: "J4kQFVIiNWmFK9sHjJQZ", gender: "male" },
