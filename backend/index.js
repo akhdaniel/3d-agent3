@@ -17,6 +17,7 @@ const openai = new OpenAI({
 });
 
 const elevenLabsApiKey = process.env.ELEVEN_LABS_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL;
 const defaultVoiceID = "EXAVITQu4vr4xnSDxMaL";
 
 
@@ -257,7 +258,7 @@ const processChatFlow = async (userMessage, requestedVoiceId, avatarName) => {
   }
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo-1106",
+    model: OPENAI_MODEL,
     // model: "deepseek-chat",
     // model: "gpt-4o-mini",
     max_tokens: 1000,
