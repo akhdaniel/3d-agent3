@@ -9,13 +9,15 @@ import multer from "multer";
 import OpenAI from "openai";
 import path from "path";
 dotenv.config();
-
+console.log(process.env.OPENAI_API_KEY)
+console.log(process.env.OPENAI_BASE_URL)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "-", // Your OpenAI API key here, I used "-" to avoid errors when the key is not set but you should not do that
+  // baseURL: process.env.OPENAI_BASE_URL
 });
 
 const elevenLabsApiKey = process.env.ELEVEN_LABS_API_KEY;
-const voiceID = "EXAVITQu4vr4xnSDxMaL";
+const defaultVoiceID = "EXAVITQu4vr4xnSDxMaL";
 
 
 const app = express();
@@ -223,7 +225,7 @@ const introMessages = async () => [
     audio: await audioFileToBase64("audios/intro_1.wav"),
     lipsync: await readJsonTranscript("audios/intro_1.json"),
     facialExpression: "sad",
-    animation: "Crying",
+    animation: "Idle",
   },
 ];
 
@@ -244,7 +246,9 @@ const missingKeyMessages = async () => [
   },
 ];
 
-const processChatFlow = async (userMessage) => {
+const processChatFlow = async (userMessage, requestedVoiceId, avatarName) => {
+  const activeVoiceId = requestedVoiceId || defaultVoiceID;
+  const activeAvatarName = avatarName || "your virtual assistant";
   if (!userMessage) {
     return { messages: await introMessages() };
   }
@@ -253,7 +257,9 @@ const processChatFlow = async (userMessage) => {
   }
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo-1106",
+    // model: "gpt-3.5-turbo-1106",
+    // model: "deepseek-chat",
+    model: "gpt-4o-mini",
     max_tokens: 1000,
     temperature: 0.6,
     response_format: {
@@ -263,11 +269,11 @@ const processChatFlow = async (userMessage) => {
       {
         role: "system",
         content: `
-        You are a virtual assistant.
+        You are a virtual assistant. Your name is ${activeAvatarName}.
         You will always reply with a JSON array of messages. With a maximum of 3 messages.
         Each message has a text, facialExpression, and animation property.
         The different facial expressions are: smile, sad, angry, surprised, funnyFace, and default.
-        The different animations are: Talking_0, Talking_1, Talking_2, Crying, Laughing, Rumba, Idle, Terrified, and Angry. 
+        The different animations are: Talking_0, Talking_1, Talking_2, Laughing, Rumba, Idle, Terrified.. 
         `,
       },
       {
@@ -287,12 +293,16 @@ const processChatFlow = async (userMessage) => {
     const textInput = message.text; // The text you wish to convert to speech
     console.log(
       `[audio] Generating speech for message ${i}`,
-      JSON.stringify({ voiceID, fileName, textPreview: textInput.slice(0, 40) })
+      JSON.stringify({
+        voiceID: activeVoiceId,
+        fileName,
+        textPreview: textInput.slice(0, 40),
+      })
     );
     try {
       const response = await voice.textToSpeech(
         elevenLabsApiKey,
-        voiceID,
+        activeVoiceId,
         fileName,
         textInput,
         0.5,
@@ -334,7 +344,11 @@ const processChatFlow = async (userMessage) => {
 
 app.post("/chat", authenticateRequest, async (req, res) => {
   try {
-    const payload = await processChatFlow(req.body?.message);
+    const payload = await processChatFlow(
+      req.body?.message,
+      req.body?.voice_id,
+      req.body?.avatarName
+    );
     res.send(payload);
   } catch (error) {
     console.error("[chat] Failed to build response", error);
@@ -389,7 +403,11 @@ app.post(
         return;
       }
 
-      const payload = await processChatFlow(transcript);
+      const payload = await processChatFlow(
+        transcript,
+        req.body?.voice_id,
+        req.body?.avatarName
+      );
       res.send({ transcript, ...payload });
     } catch (error) {
       console.error("[chat/voice] Failed to handle voice request", error);

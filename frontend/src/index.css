@@ -22,3 +22,7 @@ body.greenScreen {
   background-color: #00ff00;
   background-image: none;
 }
+
+.text-muted {
+  color: #aaa;
+}

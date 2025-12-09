@@ -51,17 +51,20 @@ const Dots = (props) => {
 
 export const Experience = () => {
   const cameraControls = useRef();
-  const { cameraZoomed } = useChat();
+  const { cameraZoomed, selectedAvatar } = useChat();
+  const activeAvatarId = selectedAvatar || "avatar1";
 
   useEffect(() => {
-    cameraControls.current.setLookAt(0, 2, 5, 0, 1.5, 0);
+    cameraControls.current.setLookAt(0, 1, 2, 0, 3, 4);
   }, []);
 
   useEffect(() => {
     if (cameraZoomed) {
-      cameraControls.current.setLookAt(0, 1.5, 1.5, 0, 1.5, 0, true);
+      console.log(cameraZoomed)
+      cameraControls.current.setLookAt(0, 1.6, 2, 0, 1.5, 0, true);
     } else {
-      cameraControls.current.setLookAt(0, 2.2, 5, 0, 1.0, 0, true);
+      console.log(cameraZoomed)
+      cameraControls.current.setLookAt(0, 1.6, 5, 0, 1.0, 0, true);
     }
   }, [cameraZoomed]);
   return (
@@ -72,7 +75,7 @@ export const Experience = () => {
       <Suspense>
         <Dots position-y={1.75} position-x={-0.02} />
       </Suspense>
-      <Avatar />
+      <Avatar key={activeAvatarId} avatarId={activeAvatarId} />
       <ContactShadows opacity={0.7} />
     </>
   );

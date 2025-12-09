@@ -6,7 +6,7 @@ Command: npx gltfjsx@6.2.3 public/models/64f1a714fe61576b46f27ca2.glb -o src/com
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { button, useControls } from "leva";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import * as THREE from "three";
 import { useChat } from "../hooks/useChat";
@@ -105,45 +105,112 @@ const corresponding = {
 };
 
 let setupMode = false;
+const DEFAULT_AVATAR_ID = "avatar3";
 
-export function Avatar(props) {
-  const { nodes, materials, scene } = useGLTF(
-    "/models/64f1a714fe61576b46f27ca2.glb"
+const getAvatarFolder = (avatarId) => {
+  if (!avatarId) {
+    return "av3";
+  }
+  const match = avatarId.match(/(\d+)/);
+  if (match) {
+    return `av${match[1]}`;
+  }
+  return avatarId;
+};
+
+export function Avatar({ avatarId = DEFAULT_AVATAR_ID, ...props }) {
+  const normalizedAvatarId = avatarId || DEFAULT_AVATAR_ID;
+  const avatarFolder = useMemo(
+    () => getAvatarFolder(normalizedAvatarId),
+    [normalizedAvatarId]
   );
+  const modelPath = `/models/${avatarFolder}/avatar.glb`;
 
-  const { message, onMessagePlayed, chat } = useChat();
+  const { message, onMessagePlayed, chat, avatarOptions = [] } = useChat();
+  const avatarMetadata = useMemo(
+    () => avatarOptions.find((option) => option.id === normalizedAvatarId),
+    [avatarOptions, normalizedAvatarId]
+  );
+  const avatarGender =
+    (avatarMetadata?.gender || "female").toLowerCase() === "male"
+      ? "male"
+      : "female";
+  const animationsPath =
+    avatarGender === "male" ? "/animations/male.glb" : "/animations/female.glb";
+
+  const { nodes, materials, scene } = useGLTF(modelPath);
 
   const [lipsync, setLipsync] = useState();
 
+  const { animations = [] } = useGLTF(animationsPath);
+  const group = useRef();
+
+  const { actions, mixer } = useAnimations(animations, group);
+
+  const defaultAnimation = useMemo(() => {
+    if (!animations.length) {
+      return "Idle";
+    }
+    return animations.find((a) => a.name === "Idle")
+      ? "Idle"
+      : animations[0].name;
+  }, [animations]);
+  const [animation, setAnimation] = useState(defaultAnimation);
+
   useEffect(() => {
-    console.log(message);
-    if (!message) {
-      setAnimation("Idle");
+    const currentAction = actions[animation];
+    console.log('currentAction', currentAction)
+    if (!currentAction) {
       return;
     }
-    setAnimation(message.animation);
-    setFacialExpression(message.facialExpression);
-    setLipsync(message.lipsync);
-    const audio = new Audio("data:audio/mp3;base64," + message.audio);
-    audio.play();
-    setAudio(audio);
-    audio.onended = onMessagePlayed;
-  }, [message]);
-
-  const { animations } = useGLTF("/models/animations.glb");
-
-  const group = useRef();
-  const { actions, mixer } = useAnimations(animations, group);
-  const [animation, setAnimation] = useState(
-    animations.find((a) => a.name === "Idle") ? "Idle" : animations[0].name // Check if Idle animation exists otherwise use first animation
-  );
-  useEffect(() => {
-    actions[animation]
+    currentAction
       .reset()
       .fadeIn(mixer.stats.actions.inUse === 0 ? 0 : 0.5)
       .play();
-    return () => actions[animation].fadeOut(0.5);
-  }, [animation]);
+    return () => {
+      if (!currentAction) {
+        return;
+      }
+      currentAction.fadeOut(0.5);
+    }
+  }, [animation, actions, mixer]);
+
+  useEffect(() => {
+    setAnimation(defaultAnimation);
+  }, [defaultAnimation]);
+
+  useEffect(() => {
+    if (!message) {
+      setAnimation(defaultAnimation);
+      lastMessageRef.current = null;
+      stopCurrentAudio();
+      return;
+    }
+
+    if (lastMessageRef.current === message) {
+      return;
+    }
+
+    lastMessageRef.current = message;
+    console.log('message.animation', message.animation)
+    setAnimation(message.animation);
+    setFacialExpression(message.facialExpression);
+    setLipsync(message.lipsync);
+    stopCurrentAudio();
+    const audio = new Audio("data:audio/mp3;base64," + message.audio);
+    audioRef.current = audio;
+    audio.onended = () => {
+      stopCurrentAudio();
+      onMessagePlayed();
+    };
+    audio.play();
+  }, [defaultAnimation, message, onMessagePlayed]);
+
+  useEffect(() => {
+    return () => {
+      stopCurrentAudio();
+    };
+  }, []);
 
   const lerpMorphTarget = (target, value, speed = 0.1) => {
     scene.traverse((child) => {
@@ -176,7 +243,16 @@ export function Avatar(props) {
   const [winkLeft, setWinkLeft] = useState(false);
   const [winkRight, setWinkRight] = useState(false);
   const [facialExpression, setFacialExpression] = useState("");
-  const [audio, setAudio] = useState();
+  const audioRef = useRef(null);
+  const lastMessageRef = useRef(null);
+
+  const stopCurrentAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+  };
 
   useFrame(() => {
     !setupMode &&
@@ -201,8 +277,8 @@ export function Avatar(props) {
     }
 
     const appliedMorphTargets = [];
-    if (message && lipsync) {
-      const currentAudioTime = audio.currentTime;
+    if (message && lipsync && audioRef.current) {
+      const currentAudioTime = audioRef.current.currentTime;
       for (let i = 0; i < lipsync.mouthCues.length; i++) {
         const mouthCue = lipsync.mouthCues[i];
         if (
@@ -373,6 +449,3 @@ export function Avatar(props) {
     </group>
   );
 }
-
-useGLTF.preload("/models/64f1a714fe61576b46f27ca2.glb");
-useGLTF.preload("/models/animations.glb");

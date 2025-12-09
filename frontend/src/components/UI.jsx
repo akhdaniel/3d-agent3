@@ -18,6 +18,10 @@ export const UI = ({ hidden, ...props }) => {
     message,
     currentUser,
     pendingTranscript,
+    selectedAvatar,
+    setSelectedAvatar,
+    avatarOptions,
+    getAvatarName,
   } = useChat();
   const [isListening, setIsListening] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -35,7 +39,8 @@ export const UI = ({ hidden, ...props }) => {
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authMessage, setAuthMessage] = useState("");
-
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showAuthControls, setShowAuthControls] = useState(false);
   useEffect(() => {
     latestLoadingRef.current = loading;
   }, [loading]);
@@ -43,6 +48,10 @@ export const UI = ({ hidden, ...props }) => {
   useEffect(() => {
     latestMessageRef.current = message;
   }, [message]);
+
+  useEffect(() => {
+    setShowAuthControls(false);
+  }, [currentUser]);
 
   const sendMessage = () => {
     const text = input.current.value;
@@ -289,20 +298,69 @@ export const UI = ({ hidden, ...props }) => {
   return (
     <>
       <div className="fixed top-0 left-0 right-0 bottom-0 z-10 flex justify-between p-4 flex-col pointer-events-none">
-        <div className="self-start pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg">
-          <h1 className="font-black text-xl">Virtual CS</h1>
-          <p>Ask me anything...in any language 😅</p>
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            {currentUser && (
-              <span className="text-gray-700">Logged in as {currentUser}</span>
-            )}
-            <button
-              onClick={logout}
-              className="pointer-events-auto bg-gray-900 text-white px-3 py-1 rounded-md text-xs uppercase tracking-wider"
-            >
-              Logout
-            </button>
+        <div className="self-start pointer-events-auto backdrop-blur-md bg-white bg-opacity-50 p-4 rounded-lg w-full max-w-xs">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-black text-xl">
+                Hi, I'm {getAvatarName(selectedAvatar)}
+              </h2>
+              <p>Ask me anything...in any language 😅</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAvatarPicker((prev) => !prev)}
+                className="bg-white/80 border border-gray-200 rounded-full px-1 text-gray-700 hover:bg-white"
+                aria-label="Choose avatar"
+              >
+                <span role="img" aria-hidden="true">
+                  🙂
+                </span>
+              </button>
+              <button
+                onClick={() => setShowAuthControls((prev) => !prev)}
+                className="bg-white/80 border border-gray-200 rounded-full px-1  text-gray-700 hover:bg-white"
+                aria-label="Account settings"
+              >
+                ⛭
+              </button>
+            </div>
           </div>
+          {showAuthControls && (
+            <div className="mt-2 flex items-center gap-2 text-sm">
+              {currentUser && (
+                <span className="text-muted">
+                  Logged in as {currentUser}
+                </span>
+              )}
+              <button
+                onClick={logout}
+                className="pointer-events-auto bg-gray-900 text-white px-3 py-1 rounded-md text-xs uppercase tracking-wider"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          {showAvatarPicker && (
+            <label className="mt-3 text-xs flex flex-col gap-1 text-gray-700">
+              <span className="font-semibold uppercase tracking-wider">
+                Choose Avatar
+              </span>
+              <select
+                className="px-3 py-2 rounded-md border border-gray-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm text-gray-900"
+                value={selectedAvatar}
+                onChange={(e) => {
+                  setSelectedAvatar(e.target.value);
+                  setShowAvatarPicker(false);
+                }}
+              >
+                {avatarOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <div className="w-full flex flex-col items-end justify-center gap-4">
           <button

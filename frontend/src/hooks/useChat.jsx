@@ -5,6 +5,36 @@ const tokenStorageKey = "vgf_token";
 
 const ChatContext = createContext();
 
+const defaultVoiceId = "EXAVITQu4vr4xnSDxMaL";
+const avatarOptions = [
+  { id: "avatar1", label: "Sarah", voice_id: defaultVoiceId, gender: "female" },
+  { id: "avatar2", label: "Christina", voice_id: "2qfp6zPuviqeCOZIE9RZ", gender: "female" },
+  { id: "avatar3", label: "Nathaniel", voice_id: "AeRdCCKzvd23BpJoofzx", gender: "male" },
+  { id: "avatar4", label: "Roger", voice_id: "CwhRBWXzGAHq8TQ4Fs17", gender: "male" },
+  { id: "avatar5", label: "Laura", voice_id: "FGY2WhTYpPnrIDTdsKH5", gender: "female" },
+  { id: "avatar6", label: "Charlie", voice_id: "IKne3meq5aSn9XLyUdCD", gender: "male" },
+  { id: "avatar7", label: "George", voice_id: "JBFqnCBsd6RMkjVDRZzb", gender: "male" },
+  { id: "avatar8", label: "Alice", voice_id: "Xb7hH8MSUJpSbSDYk0k2", gender: "female" },
+  { id: "avatar9", label: "Matilda", voice_id: "XrExE9yKIg1WjnnlVkGX", gender: "female" },
+  { id: "avatar10", label: "Jessica", voice_id: "cgSgspJ2msm6clMCkdW9", gender: "female" },
+  { id: "avatar11", label: "Eric", voice_id: "cjVigY5qzO86Huf0OWal", gender: "male" },
+  { id: "avatar12", label: "Chris", voice_id: "iP95p4xoKVk53GoZ742B", gender: "male" },
+  { id: "avatar13", label: "Lily", voice_id: "pFZP5JQG7iQjIQuC4Bku", gender: "female" },
+  { id: "avatar14", label: "Hamza", voice_id: "J4kQFVIiNWmFK9sHjJQZ", gender: "male" },
+  { id: "avatar15", label: "Wendy", voice_id: "g6xIsTj2HwM6VR4iXFCw", gender: "female" },
+  { id: "avatar16", label: "Catherine", voice_id: "LQQLqMaLCEPaf5ykcxhm", gender: "female" },
+];
+
+const getVoiceIdForAvatar = (avatarId) => {
+  const match = avatarOptions.find((option) => option.id === avatarId);
+  return match?.voice_id || avatarOptions[0]?.voice_id || defaultVoiceId;
+};
+
+const getAvatarName = (avatarId) => {
+  const match = avatarOptions.find((option) => option.id === avatarId);
+  return match?.label || avatarOptions[0]?.label || "Virtual CS";
+};
+
 const readStoredToken = () => {
   if (typeof window === "undefined") {
     return null;
@@ -21,6 +51,7 @@ export const ChatProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [cameraZoomed, setCameraZoomed] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedAvatar, setSelectedAvatar] = useState("avatar1");
   const [pendingTranscript, setPendingTranscript] = useState("");
 
   const isAuthenticated = Boolean(authToken);
@@ -55,11 +86,20 @@ export const ChatProvider = ({ children }) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          voice_id: getVoiceIdForAvatar(selectedAvatar),
+          avatarName: getAvatarName(selectedAvatar),
+        }),
       });
       const json = await response.json();
       if (!response.ok) {
-        throw new Error(json?.error || "Failed to chat.");
+        const errorMessage = json?.error || "Failed to chat.";
+        if (errorMessage === "Invalid or expired token.") {
+          await logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+        throw new Error(errorMessage);
       }
       const resp = json.messages || [];
       setMessages((messages) => [...messages, ...resp]);
@@ -82,6 +122,8 @@ export const ChatProvider = ({ children }) => {
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "speech.webm");
+      formData.append("voice_id", getVoiceIdForAvatar(selectedAvatar));
+      formData.append("avatarName", getAvatarName(selectedAvatar));
       const response = await fetch(`${backendUrl}/chat/voice`, {
         method: "POST",
         headers: {
@@ -91,7 +133,12 @@ export const ChatProvider = ({ children }) => {
       });
       const json = await response.json();
       if (!response.ok) {
-        throw new Error(json?.error || "Failed to process voice chat.");
+        const errorMessage = json?.error || "Failed to process voice chat.";
+        if (errorMessage === "Invalid or expired token.") {
+          await logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+        throw new Error(errorMessage);
       }
       setPendingTranscript(json?.transcript || "");
       const resp = json.messages || [];
@@ -194,6 +241,10 @@ export const ChatProvider = ({ children }) => {
         loading,
         cameraZoomed,
         setCameraZoomed,
+        selectedAvatar,
+        setSelectedAvatar,
+        avatarOptions,
+        getAvatarName,
       }}
     >
       {children}
