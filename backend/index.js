@@ -257,9 +257,9 @@ const processChatFlow = async (userMessage, requestedVoiceId, avatarName) => {
   }
 
   const completion = await openai.chat.completions.create({
-    // model: "gpt-3.5-turbo-1106",
+    model: "gpt-3.5-turbo-1106",
     // model: "deepseek-chat",
-    model: "gpt-4o-mini",
+    // model: "gpt-4o-mini",
     max_tokens: 1000,
     temperature: 0.6,
     response_format: {
