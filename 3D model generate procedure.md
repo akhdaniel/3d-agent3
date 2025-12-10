@@ -6,22 +6,24 @@
 
 3. Convert to FBX using blender
     - create new Generic, delete all object
-    - import GLB
-    - Export with Forward: Y Forward
+    - import model GLB
+    - Export model FBX with Forward: Y Forward
 
 4. Create animation in Mixamo,
     - import model FBX
-    - Idle
-    - Talking_0
-    - Talking_1
-    - Talking_2
-    - Terrified
-    - Dancing
-    - export each as FBX, without skin
+    - required animation name:
+        - Idle
+        - Talking_0
+        - Talking_1
+        - Talking_2
+        - Terrified
+        - Dancing
+    - export each animation as FBX, without skin
 
 5. Merge animations in blender
-    - new general, delete all existing objects  
-    - import FBXs
+    - create new, general, delete all existing objects  
+    - differentiate animation for male and female
+    - import animation FBX
     - show Dope Sheet - Action Editor
     - name it ; Idle, Talking_0, Talking_1, ...
     - import more FBX animation
@@ -33,8 +35,8 @@
     - check on Non Linear Animation
     - repeat for Talking_2, Rumba, etc...
     - Export animations to GLB, 
-    - Data Compression: True, Transform: not Y-Up parameter
-    - save to male.glb or female.glb on animations/ folder
+        - Data Compression: True, Transform: not Y-Up parameter
+        - save to male.glb or female.glb on animations/ folder
 
 6. Model & Animation GLB ready to be imported from the apps
 

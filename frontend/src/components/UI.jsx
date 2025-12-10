@@ -39,7 +39,7 @@ export const UI = ({ hidden, ...props }) => {
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authMessage, setAuthMessage] = useState("");
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(true);
   const [showAuthControls, setShowAuthControls] = useState(false);
   useEffect(() => {
     latestLoadingRef.current = loading;
@@ -304,10 +304,10 @@ export const UI = ({ hidden, ...props }) => {
               <h2 className="font-black text-xl">
                 Hi, I'm {getAvatarName(selectedAvatar)}
               </h2>
-              <p>Ask me anything...in any language 😅</p>
+              <p>Ask me anything...</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              {/* <button
                 onClick={() => setShowAvatarPicker((prev) => !prev)}
                 className="bg-white/80 border border-gray-200 rounded-full px-1 text-gray-700 hover:bg-white"
                 aria-label="Choose avatar"
@@ -315,7 +315,7 @@ export const UI = ({ hidden, ...props }) => {
                 <span role="img" aria-hidden="true">
                   🙂
                 </span>
-              </button>
+              </button> */}
               <button
                 onClick={() => setShowAuthControls((prev) => !prev)}
                 className="bg-white/80 border border-gray-200 rounded-full px-1  text-gray-700 hover:bg-white"
@@ -342,15 +342,15 @@ export const UI = ({ hidden, ...props }) => {
           )}
           {showAvatarPicker && (
             <label className="mt-3 text-xs flex flex-col gap-1 text-gray-700">
-              <span className="font-semibold uppercase tracking-wider">
+              {/* <span className="font-semibold uppercase tracking-wider">
                 Choose Avatar
-              </span>
+              </span> */}
               <select
                 className="px-3 py-2 rounded-md border border-gray-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm text-gray-900"
                 value={selectedAvatar}
                 onChange={(e) => {
                   setSelectedAvatar(e.target.value);
-                  setShowAvatarPicker(false);
+                  // setShowAvatarPicker(false);
                 }}
               >
                 {avatarOptions.map((option) => (
