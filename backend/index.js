@@ -9,11 +9,11 @@ import multer from "multer";
 import OpenAI from "openai";
 import path from "path";
 dotenv.config();
-console.log(process.env.OPENAI_API_KEY)
-console.log(process.env.OPENAI_BASE_URL)
+// console.log(process.env.OPENAI_API_KEY)
+// console.log(process.env.OPENAI_BASE_URL)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "-", // Your OpenAI API key here, I used "-" to avoid errors when the key is not set but you should not do that
-  // baseURL: process.env.OPENAI_BASE_URL
+  baseURL: process.env.OPENAI_BASE_URL || undefined
 });
 
 const elevenLabsApiKey = process.env.ELEVEN_LABS_API_KEY;
@@ -257,9 +257,10 @@ const processChatFlow = async (userMessage, requestedVoiceId, avatarName) => {
     return { messages: await missingKeyMessages() };
   }
 
+
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
-    // model: "deepseek-chat",
+    // model: "gpt-3.5-turbo-1106",
     // model: "gpt-4o-mini",
     max_tokens: 1000,
     temperature: 0.6,
@@ -284,6 +285,7 @@ const processChatFlow = async (userMessage, requestedVoiceId, avatarName) => {
     ],
   });
   let messages = JSON.parse(completion.choices[0].message.content);
+  console.log('messages',messages)
   if (messages.messages) {
     messages = messages.messages; // ChatGPT is not 100% reliable, sometimes it directly returns an array and sometimes a JSON object with a messages property
   }
@@ -403,7 +405,7 @@ app.post(
           .send({ error: "Unable to transcribe the provided audio." });
         return;
       }
-
+      console.log('transcript', transcript)
       const payload = await processChatFlow(
         transcript,
         req.body?.voice_id,
